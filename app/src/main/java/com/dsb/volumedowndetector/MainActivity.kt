@@ -1,5 +1,6 @@
 package com.dsb.volumedowndetector
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.KeyEvent
 import android.widget.Toast
@@ -20,12 +21,50 @@ class MainActivity : AppCompatActivity() {
         ProcessCameraProvider.getInstance(this)
     }
 
-    private lateinit var binding : ActivityMainBinding
+    private val permissions = listOf(
+        android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        android.Manifest.permission.READ_EXTERNAL_STORAGE,
+        android.Manifest.permission.CAMERA,
+    )
+    private val permissionRequestCode = 12
+
+    private lateinit var binding: ActivityMainBinding
+    private lateinit var cameraSelector: CameraSelector
+    private lateinit var imageCapture: ImageCapture
+    private val cameraExecutor by lazy {
+        ContextCompat.getMainExecutor(this)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(R.layout.activity_main)
+        setContentView(binding.root)
+        askForPermissions()
+    }
+
+    private fun askForPermissions() {
+        requestPermissions(permissions.toTypedArray(), permissionRequestCode)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == permissionRequestCode) {
+            if (grantResults.isNotEmpty() && grantResults.first() == PackageManager.PERMISSION_GRANTED) {
+                continueAfterGettingPermissions()
+            } else {
+                this.askForPermissions()
+            }
+        }
+    }
+
+    private fun continueAfterGettingPermissions() {
+        setup()
+        binding.testCapture.setOnClickListener {
+            onClick()
+        }
+    }
+
+    private fun setup() {
         lifecycle.addObserver(
             HardwareKeyPressedEventObserver(
                 context = this,
@@ -39,60 +78,39 @@ class MainActivity : AppCompatActivity() {
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
             bindPreview(cameraProvider)
-        }, ContextCompat.getMainExecutor(this))
+        }, cameraExecutor)
     }
 
-    fun captureImage() {
+    private fun bindPreview(cameraProvider: ProcessCameraProvider) {
+        val preview: Preview = Preview.Builder().build()
 
-    }
-
-    private fun bindPreview(cameraProvider : ProcessCameraProvider) {
-        val preview : Preview = Preview.Builder().build()
-
-        val cameraSelector : CameraSelector = CameraSelector.Builder()
+        cameraSelector = CameraSelector.Builder()
             .requireLensFacing(CameraSelector.LENS_FACING_BACK)
             .build()
 
-        val imageCapture = ImageCapture.Builder()
-            .setTargetRotation(binding.previewView.display.rotation)
+        imageCapture = ImageCapture.Builder()
+            .setTargetRotation(binding.root.display.rotation)
             .build()
 
         preview.setSurfaceProvider(binding.previewView.surfaceProvider)
 
-        var camera = cameraProvider.bindToLifecycle(this as LifecycleOwner, cameraSelector,imageCapture, preview)
+        var camera = cameraProvider.bindToLifecycle(this as LifecycleOwner, cameraSelector, imageCapture, preview)
     }
 
     fun onClick() {
-        val outputFileOptions = ImageCapture.OutputFileOptions.Builder(File("sdcard/")).build()
-        imageCapture.takePicture(outputFileOptions, cameraExecutor,
+        val outputFileOptions = ImageCapture.OutputFileOptions.Builder(File("sdcard/VolumeDownPhoto/")).build()
+        imageCapture.takePicture(
+            outputFileOptions, cameraExecutor,
             object : ImageCapture.OnImageSavedCallback {
-                override fun onError(error: ImageCaptureException)
-                {
+                override fun onError(error: ImageCaptureException) {
                     // insert your code here.
                 }
+
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                     // insert your code here.
                 }
-            })
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        if (requestCode == REQUEST_CODE_PERMISSIONS) {
-            if (allPermissionsGranted()) {
-                startCamera()
-            } else {
-                Toast.makeText(
-                    this,
-                    "Permissions not granted by the user.",
-                    Toast.LENGTH_SHORT
-                ).show()
-                finish()
             }
-        }
+        )
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
