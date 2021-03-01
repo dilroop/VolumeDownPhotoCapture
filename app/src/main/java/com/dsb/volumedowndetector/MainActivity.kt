@@ -2,6 +2,8 @@ package com.dsb.volumedowndetector
 
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Environment
+import android.util.Log
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -15,6 +17,8 @@ import androidx.lifecycle.LifecycleOwner
 import com.dsb.volumedowndetector.databinding.ActivityMainBinding
 import com.google.common.util.concurrent.ListenableFuture
 import java.io.File
+import java.time.LocalDate
+import java.time.LocalDateTime
 
 class MainActivity : AppCompatActivity() {
     private val cameraProviderFuture: ListenableFuture<ProcessCameraProvider> by lazy {
@@ -98,16 +102,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun onClick() {
-        val outputFileOptions = ImageCapture.OutputFileOptions.Builder(File("sdcard/VolumeDownPhoto/")).build()
+        val directory = Environment.getExternalStorageState() + "/VolumeDownPhoto/"
+        File(directory).mkdirs()
+        val name = "$directory${LocalDateTime.now()}.jpg"
+        Log.i("onclick", name)
+        val outputFileOptions = ImageCapture.OutputFileOptions.Builder(File(name)).build()
         imageCapture.takePicture(
-            outputFileOptions, cameraExecutor,
+            outputFileOptions,
+            cameraExecutor,
             object : ImageCapture.OnImageSavedCallback {
                 override fun onError(error: ImageCaptureException) {
-                    // insert your code here.
+                    Toast.makeText(this@MainActivity, "Error ${error.toString()}", Toast.LENGTH_LONG).show()
                 }
 
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    // insert your code here.
+                    Toast.makeText(this@MainActivity, "Saved ${outputFileResults.savedUri.toString()}", Toast.LENGTH_LONG).show()
                 }
             }
         )
